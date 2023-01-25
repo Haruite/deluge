@@ -8,6 +8,7 @@
 
 import logging
 import os
+from typing import Dict
 
 import deluge.common
 import deluge.log
@@ -19,7 +20,7 @@ log = logging.getLogger(__name__)
 class _ConfigManager:
     def __init__(self):
         log.debug('ConfigManager started..')
-        self.config_files = {}
+        self.config_files: Dict[str, Config] = {}
         self.__config_directory = None
 
     @property
@@ -86,7 +87,7 @@ class _ConfigManager:
         # We need to return True to keep the timer active
         return True
 
-    def get_config(self, config_file, defaults=None, file_version=1):
+    def get_config(self, config_file: str, defaults=None, file_version=1) -> Config:
         """Get a reference to the Config object for this filename"""
         log.debug('Getting config: %s', config_file)
         # Create the config object if not already created

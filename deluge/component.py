@@ -9,6 +9,7 @@
 import logging
 import traceback
 from collections import defaultdict
+from typing import List, Dict, DefaultDict, Optional
 
 from twisted.internet import reactor
 from twisted.internet.defer import DeferredList, fail, maybeDeferred, succeed
@@ -88,7 +89,7 @@ class Component:
 
     """
 
-    def __init__(self, name, interval=1, depend=None):
+    def __init__(self, name: str, interval: int = 1, depend: Optional[List[str]] = None):
         """Initialize component.
 
         Args:
@@ -253,9 +254,9 @@ class ComponentRegistry:
     """
 
     def __init__(self):
-        self.components = {}
+        self.components: Dict[str, Component] = {}
         # Stores all of the components that are dependent on a particular component
-        self.dependents = defaultdict(list)
+        self.dependents: DefaultDict[str, List[str]] = defaultdict(list)
 
     def register(self, obj):
         """Register a component object with the registry.
@@ -470,7 +471,7 @@ update = _ComponentRegistry.update
 shutdown = _ComponentRegistry.shutdown
 
 
-def get(name):
+def get(name) -> Component:
     """Return a reference to a component.
 
     Args:
