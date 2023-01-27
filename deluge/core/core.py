@@ -807,7 +807,7 @@ class Core(component.Component):
         return self.torrentmanager.get_torrent_list()
 
     @export
-    def get_config(self) -> Dict[str, any]:
+    def get_config(self) -> Dict[str, Any]:
         """Get all the preferences as a dictionary"""
         return self.config.config
 
