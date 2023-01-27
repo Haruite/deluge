@@ -13,6 +13,7 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 from base64 import b64decode, b64encode
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.request import urlopen
@@ -200,27 +201,24 @@ class Core(component.Component):
         hit_ratio_keys = ['write_hit_ratio', 'read_hit_ratio']
         self.session_status.update({k: 0.0 for k in hit_ratio_keys})
 
+        self.last_session_rate_update_ts = 0
+        self.last_post_session_stats_ts = 0
         self.session_status_timer_interval = 0.5
-        self.session_status_timer = task.LoopingCall(self.session.post_session_stats)
+        self.session_status_timer = task.LoopingCall(self._update_session_stats)
         self.alertmanager.register_handler(
             'session_stats_alert', self._on_alert_session_stats
         )
-        self.session_rates_timer_interval = 2
-        self.session_rates_timer = task.LoopingCall(self._update_session_rates)
+        self.session_rates_timer_interval = 1.5
 
     def start(self):
         """Starts the core"""
         self.session_status_timer.start(self.session_status_timer_interval)
-        self.session_rates_timer.start(self.session_rates_timer_interval, now=False)
 
     def stop(self):
         log.debug('Core stopping...')
 
         if self.session_status_timer.running:
             self.session_status_timer.stop()
-
-        if self.session_rates_timer.running:
-            self.session_rates_timer.stop()
 
         # Save the libtorrent session state
         self._save_session_state()
@@ -341,6 +339,12 @@ class Core(component.Component):
     def _on_alert_session_stats(self, alert):
         """The handler for libtorrent session stats alert"""
         self.session_status.update(alert.values)
+        if self.last_session_rate_update_ts:
+            interval = self.last_post_session_stats_ts - self.last_session_rate_update_ts
+            if interval > self.session_rates_timer_interval - 0.1:
+                self._update_session_rates(interval)
+        else:
+            self.last_session_rate_update_ts = self.last_post_session_stats_ts
         self._update_session_cache_hit_ratio()
 
     def _update_session_cache_hit_ratio(self):
@@ -362,7 +366,11 @@ class Core(component.Component):
         else:
             self.session_status['read_hit_ratio'] = 0.0
 
-    def _update_session_rates(self):
+    def _update_session_stats(self):
+        self.session.post_session_stats()
+        self.last_post_session_stats_ts = time.time()
+
+    def _update_session_rates(self, interval):
         """Calculate session status rates.
 
         Uses polling interval and counter difference for session_status rates.
@@ -371,9 +379,10 @@ class Core(component.Component):
             new_bytes = self.session_status[SESSION_RATES_MAPPING[rate_key]]
             self.session_status[rate_key] = (
                 new_bytes - prev_bytes
-            ) / self.session_rates_timer_interval
+            ) / interval
             # Store current value for next update.
             self._session_prev_bytes[rate_key] = new_bytes
+        self.last_session_rate_update_ts = self.last_post_session_stats_ts
 
     def get_new_release(self):
         log.debug('get_new_release')
